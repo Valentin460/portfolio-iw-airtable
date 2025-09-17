@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface NavigationProps {
@@ -9,9 +9,20 @@ interface NavigationProps {
 const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
   const { user, logout } = useAuth();
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const updateIsMobile = () => setIsMobile(window.innerWidth <= 768);
+    updateIsMobile();
+    window.addEventListener('resize', updateIsMobile);
+    return () => window.removeEventListener('resize', updateIsMobile);
+  }, []);
+
   const handleLogout = () => {
     logout();
     onViewChange('projects');
+    if (isMobile) setMenuOpen(false);
   };
 
   const navStyle: React.CSSProperties = {
@@ -21,7 +32,8 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
     justifyContent: 'space-between',
     alignItems: 'center',
     borderBottom: '2px solid #61dafb',
-    marginBottom: '2rem'
+    marginBottom: '2rem',
+    position: 'relative'
   };
 
   const logoStyle: React.CSSProperties = {
@@ -31,11 +43,29 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
     cursor: 'pointer'
   };
 
-  const navLinksStyle: React.CSSProperties = {
+  const navLinksDesktopStyle: React.CSSProperties = {
     display: 'flex',
     gap: '1rem',
     alignItems: 'center'
   };
+
+  const navLinksMobileStyle: React.CSSProperties = {
+    display: menuOpen ? 'flex' : 'none',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#282c34',
+    padding: '1rem',
+    borderBottom: '2px solid #61dafb',
+    zIndex: 1000
+  };
+
+  const navLinksStyle: React.CSSProperties = isMobile
+    ? navLinksMobileStyle
+    : navLinksDesktopStyle;
 
   const linkStyle: React.CSSProperties = {
     color: '#ffffff',
@@ -67,26 +97,52 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
     marginRight: '1rem'
   };
 
+  const hamburgerButtonStyle: React.CSSProperties = {
+    display: isMobile ? 'block' : 'none',
+    width: '36px',
+    height: '32px',
+    padding: 0,
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    marginLeft: '1rem'
+  };
+
+  const hamburgerBarStyle: React.CSSProperties = {
+    display: 'block',
+    width: '100%',
+    height: '3px',
+    backgroundColor: '#61dafb',
+    borderRadius: '2px',
+    transition: 'transform 0.2s ease, opacity 0.2s ease',
+    marginTop: '6px'
+  };
+
+  const handleLinkClick = (view: string) => {
+    onViewChange(view);
+    if (isMobile) setMenuOpen(false);
+  };
+
   return (
     <nav style={navStyle}>
       <div 
         style={logoStyle}
-        onClick={() => onViewChange('projects')}
+        onClick={() => handleLinkClick('projects')}
       >
         Portfolio IW
       </div>
       
-      <div style={navLinksStyle}>
+      <div id="nav-links" style={navLinksStyle}>
         <span
           style={currentView === 'projects' ? activeLinkStyle : linkStyle}
-          onClick={() => onViewChange('projects')}
+          onClick={() => handleLinkClick('projects')}
         >
           Projets
         </span>
         
         <span
           style={currentView === 'search' ? activeLinkStyle : linkStyle}
-          onClick={() => onViewChange('search')}
+          onClick={() => handleLinkClick('search')}
         >
           Recherche
         </span>
@@ -95,7 +151,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
           <>
             <span
               style={currentView === 'profile' ? activeLinkStyle : linkStyle}
-              onClick={() => onViewChange('profile')}
+              onClick={() => handleLinkClick('profile')}
             >
               Mon Profil
             </span>
@@ -113,19 +169,31 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
           <>
             <span
               style={currentView === 'login' ? activeLinkStyle : linkStyle}
-              onClick={() => onViewChange('login')}
+              onClick={() => handleLinkClick('login')}
             >
               Connexion
             </span>
             <span
               style={currentView === 'register' ? activeLinkStyle : linkStyle}
-              onClick={() => onViewChange('register')}
+              onClick={() => handleLinkClick('register')}
             >
               Inscription
             </span>
           </>
         )}
       </div>
+
+      <button
+        style={hamburgerButtonStyle}
+        aria-label="Menu"
+        aria-controls="nav-links"
+        aria-expanded={menuOpen}
+        onClick={() => setMenuOpen((o) => !o)}
+      >
+        <span style={{ ...hamburgerBarStyle, marginTop: 0, transform: menuOpen ? 'translateY(9px) rotate(45deg)' : 'none' }} />
+        <span style={{ ...hamburgerBarStyle, opacity: menuOpen ? 0 : 1 }} />
+        <span style={{ ...hamburgerBarStyle, transform: menuOpen ? 'translateY(-9px) rotate(-45deg)' : 'none' }} />
+      </button>
     </nav>
   );
 };
