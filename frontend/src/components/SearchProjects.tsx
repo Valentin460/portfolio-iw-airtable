@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Skeleton from '@mui/material/Skeleton';
 import { Project } from '../types';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +40,7 @@ const SearchProjects: React.FC<SearchProjectsProps> = ({ onProjectSelect }) => {
       setError(null);
       
       const projectsData = await apiService.getProjects();
+      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
       setAllProjects(projectsData);
       setFilteredResults(projectsData);
     } catch (err) {
@@ -210,7 +212,34 @@ const SearchProjects: React.FC<SearchProjectsProps> = ({ onProjectSelect }) => {
   };
 
   if (loading) {
-    return <div style={messageStyle}>Chargement des projets...</div>;
+    return (
+      <div style={containerStyle}>
+        <h1 style={titleStyle}>Rechercher des Projets</h1>
+        <div style={searchFormStyle}>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Rechercher par titre ou description..."
+            style={searchInputStyle}
+          />
+        </div>
+        <div style={gridStyle}>
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div key={idx} style={cardStyle}>
+              <Skeleton variant="text" width="60%" height={28} sx={{ bgcolor: 'grey.800' }} />
+              <Skeleton variant="rectangular" height={200} sx={{ borderRadius: '4px', my: 1, bgcolor: 'grey.900' }} />
+              <Skeleton variant="text" width="90%" sx={{ bgcolor: 'grey.800' }} />
+              <Skeleton variant="text" width="80%" sx={{ bgcolor: 'grey.800' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.5rem' }}>
+                <Skeleton variant="text" width={120} sx={{ bgcolor: 'grey.800' }} />
+                <Skeleton variant="circular" width={24} height={24} sx={{ bgcolor: 'grey.800' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (error) {
