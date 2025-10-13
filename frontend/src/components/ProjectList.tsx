@@ -18,11 +18,10 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
     loadProjects();
   }, [user]);
 
-  const loadProjects = async () => {
+  const loadProjects = async (force = false) => {
     try {
       setLoading(true);
-      const projectsData = await apiService.getProjects();
-      await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      const projectsData = await apiService.getProjects({ force });
       setProjects(projectsData);
       setError(null);
     } catch (err) {
@@ -48,8 +47,8 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
         await apiService.likeProject(project.airtableId.toString());
       }
 
-      // Recharger les projets pour mettre à jour les likes
-      await loadProjects();
+      // Recharger les projets pour mettre à jour les likes (forcer le refetch)
+      await loadProjects(true);
     } catch (err) {
       console.error("Error toggling like:", err);
       alert("Erreur lors de la mise à jour du like");
@@ -203,7 +202,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
         {error}
         <br />
         <button
-          onClick={loadProjects}
+          onClick={() => loadProjects()}
           style={{
             marginTop: "1rem",
             padding: "0.5rem 1rem",

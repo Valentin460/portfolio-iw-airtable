@@ -3,6 +3,8 @@ import { Project, User, AuthResponse, LoginData, RegisterData } from '../types';
 const API_BASE_URL = process.env.REACT_APP_API_URL || '';
 
 class ApiService {
+  private projectsCache: Project[] | null = null;
+  private cacheToken: string | null = null;
   private getAuthHeaders(): HeadersInit {
     const token = localStorage.getItem('token');
     return {
@@ -64,11 +66,28 @@ class ApiService {
   }
 
 
-  async getProjects(): Promise<Project[]> {
+  async getProjects(options?: { force?: boolean }): Promise<Project[]> {
+    const currentToken = localStorage.getItem('token');
+    if (this.cacheToken !== (currentToken || null)) {
+      // Invalider le cache si le token change (état de connexion)
+      this.projectsCache = null;
+      this.cacheToken = currentToken || null;
+    }
+
+    if (!options?.force && this.projectsCache) {
+      return this.projectsCache;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/projects`, {
       headers: this.getAuthHeaders()
     });
-    return this.handleResponse<Project[]>(response);
+    const data = await this.handleResponse<Project[]>(response);
+    this.projectsCache = data;
+    return data;
+  }
+
+  invalidateProjectsCache() {
+    this.projectsCache = null;
   }
 
   async getProject(id: string): Promise<Project> {
