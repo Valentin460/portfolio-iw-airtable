@@ -47,8 +47,21 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
         await apiService.likeProject(project.airtableId.toString());
       }
 
-      // Recharger les projets pour mettre à jour les likes (forcer le refetch)
-      await loadProjects(true);
+      // Mettre à jour localement pour éviter un rechargement complet
+      setProjects((prevProjects) =>
+        prevProjects.map((p) =>
+          p.id === project.id
+            ? {
+                ...p,
+                isLiked: !p.isLiked,
+                likes: p.isLiked ? p.likes - 1 : p.likes + 1,
+              }
+            : p
+        )
+      );
+
+      // Invalider le cache côté frontend pour les prochains fetch
+      apiService.invalidateProjectsCache();
     } catch (err) {
       console.error("Error toggling like:", err);
       alert("Erreur lors de la mise à jour du like");

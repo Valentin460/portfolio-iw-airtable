@@ -1,8 +1,28 @@
 const { base, airtableCall } = require('../config/airtable');
+const projectsService = require('./projects.service');
 
 // Petit cache en mémoire pour les likes
 const LIKES_CACHE_TTL_MS = 30 * 1000; // 30s
 const likesCache = new Map(); // key: userId -> { data: Set, timestamp }
+
+function recordBelongsToUser(record, userId) {
+  const target = String(userId);
+  const userField = record.fields.user;
+
+  if (!userField) {
+    return false;
+  }
+
+  if (Array.isArray(userField)) {
+    return userField.some((value) => String(value) === target);
+  }
+
+  if (typeof userField === 'string' || typeof userField === 'number') {
+    return String(userField) === target;
+  }
+
+  return false;
+}
 
 const likesService = {
   async getLikedProjectsForUser(userId) {
@@ -16,17 +36,23 @@ const likesService = {
       return cached.data;
     }
 
+    // On récupère toutes les entrées puis on filtre côté Node
     const records = await airtableCall(
       () =>
         base(process.env.AIRTABLE_LIKE_TABLE_ID)
-          .select({
-            filterByFormula: `{user} = "${userId}"`
-          })
+          .select()
           .all(),
-      `GET /Likes?user=${userId}`
+      `GET /Likes (for user ${userId})`
     );
 
-    const likedProjects = new Set(records.map(r => r.fields.project)); // set des airtableId de projet
+    const userRecords = records.filter((r) => recordBelongsToUser(r, userId));
+
+    const likedProjects = new Set(
+      userRecords
+        .map((r) => r.fields.project)
+        .filter((p) => p != null)
+        .map((p) => String(p))
+    ); // set des airtableId de projet
 
     likesCache.set(cacheKey, {
       data: likedProjects,
@@ -39,18 +65,9 @@ const likesService = {
   // Ajouter un like
   async addLike(userId, projectAirtableId) {
     try {
-      // Vérifier si le like existe déjà
-      const existingLikes = await airtableCall(
-        () =>
-          base(process.env.AIRTABLE_LIKE_TABLE_ID)
-            .select({
-              filterByFormula: `AND({user} = "${userId}", {project} = "${projectAirtableId}")`
-            })
-            .all(),
-        'GET /Likes (check existing)'
-      );
-
-      if (existingLikes.length > 0) {
+      // Vérifier si le like existe déjà via le Set calculé
+      const likedProjects = await this.getLikedProjectsForUser(userId);
+      if (likedProjects.has(String(projectAirtableId))) {
         throw new Error('Like already exists');
       }
 
@@ -71,6 +88,9 @@ const likesService = {
       // Invalider le cache des likes pour cet utilisateur
       likesCache.delete(String(userId));
 
+      // Invalider le cache des projets pour refléter le nouveau nombre de likes
+      projectsService.invalidateCache();
+
       return { success: true, likeId: records[0].id };
     } catch (error) {
       console.error('Error adding like:', error);
@@ -81,27 +101,66 @@ const likesService = {
   // Supprimer un like
   async removeLike(userId, projectAirtableId) {
     try {
+      // Récupérer tous les likes puis filtrer côté Node
       const records = await airtableCall(
         () =>
           base(process.env.AIRTABLE_LIKE_TABLE_ID)
-            .select({
-              filterByFormula: `AND({user} = "${userId}", {project} = "${projectAirtableId}")`
-            })
+            .select()
             .all(),
         'GET /Likes (find for delete)'
       );
 
-      if (records.length === 0) {
+      const userRecords = records.filter((r) => recordBelongsToUser(r, userId));
+
+      const target = String(projectAirtableId);
+
+      const likeRecord = userRecords.find((r) => {
+        const projectField = r.fields.project;
+
+        if (projectField == null) {
+          return false;
+        }
+
+        // Champ texte / nombre simple
+        if (typeof projectField === 'string' || typeof projectField === 'number') {
+          return String(projectField) === target;
+        }
+
+        // Champ tableau (par ex. lien vers un projet)
+        if (Array.isArray(projectField)) {
+          return projectField.some((value) => {
+            if (typeof value === 'string' || typeof value === 'number') {
+              return String(value) === target;
+            }
+            if (value && typeof value === 'object' && 'id' in value) {
+              return String(value.id) === target;
+            }
+            return false;
+          });
+        }
+
+        // Objet simple avec un id
+        if (typeof projectField === 'object' && 'id' in projectField) {
+          return String(projectField.id) === target;
+        }
+
+        return false;
+      });
+
+      if (!likeRecord) {
         throw new Error('Like not found');
       }
-
+      
       await airtableCall(
-        () => base(process.env.AIRTABLE_LIKE_TABLE_ID).destroy([records[0].id]),
+        () => base(process.env.AIRTABLE_LIKE_TABLE_ID).destroy([likeRecord.id]),
         'DELETE /Likes/:id'
       );
 
       // Invalider le cache des likes pour cet utilisateur
       likesCache.delete(String(userId));
+
+      // Invalider le cache des projets pour refléter le nouveau nombre de likes
+      projectsService.invalidateCache();
 
       return { success: true };
     } catch (error) {
@@ -113,17 +172,8 @@ const likesService = {
   // Vérifier si un utilisateur a liké un projet
   async hasUserLikedProject(userId, projectAirtableId) {
     try {
-      const records = await airtableCall(
-        () =>
-          base(process.env.AIRTABLE_LIKE_TABLE_ID)
-            .select({
-              filterByFormula: `AND({user} = "${userId}", {project} = "${projectAirtableId}")`
-            })
-            .all(),
-        'GET /Likes (check user/project)'
-      );
-
-      return records.length > 0;
+      const likedProjects = await this.getLikedProjectsForUser(userId);
+      return likedProjects.has(String(projectAirtableId));
     } catch (error) {
       console.error('Error checking like status:', error);
       throw error;
@@ -132,4 +182,3 @@ const likesService = {
 };
 
 module.exports = likesService;
-

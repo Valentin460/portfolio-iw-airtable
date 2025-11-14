@@ -7,6 +7,7 @@ import SearchProjects from './components/SearchProjects';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import UserProfile from './components/UserProfile';
+import { apiService } from './services/api';
 import { Project } from './types';
 
 function App() {
@@ -75,6 +76,26 @@ interface ProjectDetailProps {
 }
 
 const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
+  const [currentProject, setCurrentProject] = React.useState<Project>(project);
+
+  React.useEffect(() => {
+    let isMounted = true;
+
+    apiService
+      .getProject(project.id)
+      .then((freshProject) => {
+        if (isMounted) {
+          setCurrentProject(freshProject);
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching project detail:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [project.id]);
   const containerStyle: React.CSSProperties = {
     maxWidth: '800px',
     margin: '2rem auto',
@@ -120,7 +141,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
 
   const likeInfoStyle: React.CSSProperties = {
     fontSize: '1.2rem',
-    color: project.isLiked ? '#ff6b6b' : '#888'
+    color: currentProject.isLiked ? '#ff6b6b' : '#888'
   };
 
   return (
@@ -138,12 +159,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
         ← Retour aux projets
       </button>
       
-      <h1 style={titleStyle}>{project.title}</h1>
+      <h1 style={titleStyle}>{currentProject.title}</h1>
       
-      {project.picture && (
+      {currentProject.picture && (
         <img 
-          src={project.picture} 
-          alt={project.title}
+          src={currentProject.picture} 
+          alt={currentProject.title}
           style={{
             width: '100%',
             maxHeight: '400px',
@@ -156,15 +177,15 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, onBack }) => {
       
       <div style={metaStyle}>
         <span style={{ color: '#888' }}>
-          Créé le {new Date(project.createdAt).toLocaleDateString()}
+          Créé le {new Date(currentProject.createdAt).toLocaleDateString()}
         </span>
         <span style={likeInfoStyle}>
-          {project.isLiked ? '❤️' : '🤍'} {project.likes} like{project.likes > 1 ? 's' : ''}
+          {currentProject.isLiked ? '❤️' : '🤍'} {currentProject.likes} like{currentProject.likes > 1 ? 's' : ''}
         </span>
       </div>
       
       <div style={descriptionStyle}>
-        {project.description}
+        {currentProject.description}
       </div>
     </div>
   );

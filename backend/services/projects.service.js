@@ -5,6 +5,10 @@ const PROJECTS_CACHE_TTL_MS = 30 * 1000; // 30s
 let projectsCache = { data: null, timestamp: 0 };
 
 const projectsService = {
+  invalidateCache() {
+    projectsCache = { data: null, timestamp: 0 };
+  },
+
   // Récupérer tous les projets
   async getAllProjects() {
     try {
@@ -101,4 +105,3 @@ const projectsService = {
 };
 
 module.exports = projectsService;
-
