@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const airtableService = require('../services/airtableService');
 
 // Clé secrète pour JWT (à mettre dans .env en production)
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -29,17 +28,12 @@ const authMiddleware = {
       }
 
       const decoded = jwt.verify(token, JWT_SECRET);
-      
-      // Récupérer les informations utilisateur depuis Airtable
-      const user = await airtableService.getUserById(decoded.userId);
-      
-      if (!user) {
-        return res.status(401).json({ 
-          error: 'Invalid token. User not found.' 
-        });
-      }
 
-      req.user = user;
+      // Ne pas appeler Airtable ici : on se contente du contenu du JWT
+      req.user = {
+        id: decoded.userId,
+        email: decoded.email
+      };
       next();
     } catch (error) {
       if (error.name === 'JsonWebTokenError') {
@@ -71,9 +65,12 @@ const authMiddleware = {
       }
 
       const decoded = jwt.verify(token, JWT_SECRET);
-      const user = await airtableService.getUserById(decoded.userId);
-      
-      req.user = user || null;
+
+      // Auth optionnelle : on ne recharge pas l'utilisateur depuis Airtable
+      req.user = {
+        id: decoded.userId,
+        email: decoded.email
+      };
       next();
     } catch (error) {
       // En cas d'erreur, on continue sans utilisateur
