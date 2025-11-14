@@ -158,7 +158,7 @@ const ProjectList: React.FC<ProjectListProps> = ({ onProjectSelect }) => {
   if (loading) {
     return (
       <div style={containerStyle}>
-        <h1 style={titleStyle}>Projets étudiants - Ingénierie du Web</h1>
+        <h1 style={titleStyle}>Projets Étudiants - Ingénierie du Web</h1>
         <div style={gridStyle}>
           {Array.from({ length: 6 }).map((_, idx) => (
             <div key={idx} style={cardStyle}>
